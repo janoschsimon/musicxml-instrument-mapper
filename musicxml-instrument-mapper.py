@@ -1,127 +1,4 @@
-    def play_test_sound(self, instrument_id):
-        """
-        Spielt einen Testton für das ausgewählte Instrument.
-        Verwendet MuseScore im Hintergrund, wenn verfügbar.
-        """
-        self.status_var.set(f"Versuche Testton für {instrument_id}...")
-        
-        try:
-            # Temporäre MusicXML erstellen mit dem entsprechenden Instrument
-            temp_dir = os.path.expanduser("~/Documents/MusicXMLMapper_temp")
-            os.makedirs(temp_dir, exist_ok=True)
-            
-            temp_xml_path = os.path.join(temp_dir, "test_sound.xml")
-            
-            # Erstelle eine einfache MusicXML mit einer Note
-            xml_content = f"""<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
-<score-partwise version="3.1">
-  <part-list>
-    <score-part id="P1">
-      <part-name>Test Instrument</part-name>
-      <score-instrument id="P1-I1">
-        <instrument-name>Test</instrument-name>
-        <instrument-sound>{instrument_id}</instrument-sound>
-      </score-instrument>
-    </score-part>
-  </part-list>
-  <part id="P1">
-    <measure number="1">
-      <attributes>
-        <divisions>1</divisions>
-        <key>
-          <fifths>0</fifths>
-        </key>
-        <time>
-          <beats>4</beats>
-          <beat-type>4</beat-type>
-        </time>
-        <clef>
-          <sign>G</sign>
-          <line>2</line>
-        </clef>
-      </attributes>
-      <note>
-        <pitch>
-          <step>C</step>
-          <octave>4</octave>
-        </pitch>
-        <duration>4</duration>
-        <type>whole</type>
-      </note>
-    </measure>
-  </part>
-</score-partwise>"""
-            
-            with open(temp_xml_path, "w") as f:
-                f.write(xml_content)
-            
-            # Versuche MuseScore zu finden und auszuführen
-            musescore_path = self._find_musescore_executable()
-            
-            if musescore_path:
-                import subprocess
-                
-                # Starte MuseScore mit der temporären Datei
-                process = subprocess.Popen([musescore_path, temp_xml_path], 
-                                          stdout=subprocess.PIPE, 
-                                          stderr=subprocess.PIPE)
-                
-                self.status_var.set(f"Testton für {instrument_id} wird abgespielt...")
-                
-                # Warte kurz und schließe dann MuseScore
-                self.root.after(3000, lambda: self._close_musescore_process(process))
-            else:
-                self.status_var.set("MuseScore nicht gefunden. Tonwiedergabe nicht möglich.")
-                messagebox.showinfo("Test-Sound", 
-                                   f"MuseScore wurde nicht gefunden. Eine Test-XML wurde erstellt unter:\n{temp_xml_path}\n\n"
-                                   "Öffnen Sie diese Datei manuell in MuseScore, um den Sound zu testen.")
-        
-        except Exception as e:
-            self.status_var.set(f"Fehler beim Abspielen des Testtons: {str(e)}")
-    
-    def _find_musescore_executable(self):
-        """Findet den Pfad zur MuseScore-Executable basierend auf dem Betriebssystem."""
-        system = platform.system()
-        
-        if system == "Windows":
-            # Suche in typischen Windows-Pfaden
-            for program_files in [os.environ.get("ProgramFiles"), os.environ.get("ProgramFiles(x86)")]:
-                if not program_files:
-                    continue
-                
-                for version in ["MuseScore 4", "MuseScore 3"]:
-                    path = os.path.join(program_files, version, "bin", "MuseScore4.exe" if "4" in version else "MuseScore3.exe")
-                    if os.path.exists(path):
-                        return path
-        
-        elif system == "Darwin":  # macOS
-            # Suche MuseScore auf macOS
-            for version in ["4", "3"]:
-                path = f"/Applications/MuseScore {version}.app/Contents/MacOS/mscore"
-                if os.path.exists(path):
-                    return path
-        
-        elif system == "Linux":
-            # Suche nach verschiedenen MuseScore-Binaries auf Linux
-            for binary in ["mscore", "musescore", "mscore-4.0", "mscore3"]:
-                try:
-                    import shutil
-                    path = shutil.which(binary)
-                    if path:
-                        return path
-                except:
-                    pass
-        
-        return None
-    
-    def _close_musescore_process(self, process):
-        """Schließt den MuseScore-Prozess nach einer Verzögerung."""
-        try:
-            process.terminate()
-            self.status_var.set("Bereit")
-        except:
-            passimport tkinter as tk
+import tkinter as tk
 from tkinter import filedialog, ttk, messagebox
 import xml.etree.ElementTree as ET
 import re
@@ -134,7 +11,7 @@ class MusicXMLInstrumentMapper:
     def __init__(self, root):
         self.root = root
         self.root.title("MusicXML Instrument Mapper")
-        self.root.geometry("800x600")
+        self.root.geometry("1024x768")
         
         # Initialisierung für Sound-Libraries
         self.sound_libraries = {}
@@ -152,47 +29,6 @@ class MusicXMLInstrumentMapper:
                 "Woodwinds": ["woodwinds.flute.berlin", "woodwinds.oboe.berlin"],
                 "Brass": ["brass.trumpet.berlin", "brass.horn.berlin"],
                 "Percussion": ["percussion.timpani.berlin", "percussion.cymbals.berlin"]
-            },
-            "MS Basic": {
-                "Strings": ["strings.violin", "strings.viola", "strings.cello", "strings.contrabass"],
-                "Woodwinds": ["woodwinds.flute", "woodwinds.oboe", "woodwinds.clarinet", "woodwinds.bassoon"],
-                "Brass": ["brass.trumpet", "brass.horn", "brass.trombone", "brass.tuba"],
-                "Percussion": ["percussion.timpani", "percussion.snare", "percussion.bass"],
-                "Keyboard": ["piano", "harpsichord", "organ"]
-            },
-            "Muse Strings": {
-                "Strings": [
-                    "strings.violin.muse", 
-                    "strings.viola.muse", 
-                    "strings.cello.muse", 
-                    "strings.contrabass.muse",
-                    "strings.ensemble.muse"
-                ]
-            },
-            "Muse Choir": {
-                "Choir": [
-                    "choir.soprano.muse", 
-                    "choir.alto.muse", 
-                    "choir.tenor.muse", 
-                    "choir.bass.muse",
-                    "choir.mixed.muse"
-                ]
-            },
-            "Muse Keys": {
-                "Keyboard": [
-                    "piano.grand.muse", 
-                    "piano.upright.muse", 
-                    "piano.electric.muse",
-                    "harpsichord.muse",
-                    "organ.church.muse"
-                ]
-            },
-            "SoundFonts": {
-                "Strings": ["strings.violin.sf", "strings.viola.sf", "strings.cello.sf", "strings.contrabass.sf"],
-                "Woodwinds": ["woodwinds.flute.sf", "woodwinds.oboe.sf", "woodwinds.clarinet.sf", "woodwinds.bassoon.sf"],
-                "Brass": ["brass.trumpet.sf", "brass.horn.sf", "brass.trombone.sf", "brass.tuba.sf"],
-                "Percussion": ["percussion.timpani.sf", "percussion.snare.sf", "percussion.bass.sf"],
-                "Keyboard": ["piano.sf", "harpsichord.sf", "organ.sf"]
             }
         }
         
@@ -291,147 +127,127 @@ class MusicXMLInstrumentMapper:
             
             self.instrument_mappings = []
             
-            # UI aktualisieren um Feedback zu geben
-            self.status_var.set("Analysiere XML-Datei...")
-            self.root.update()
+            # Parse XML
+            self.xml_tree = ET.parse(file_path)
+            root = self.xml_tree.getroot()
             
-            # Parse XML in einem separaten Thread für bessere Performance
-            import threading
+            # Finde Namespace falls vorhanden
+            ns = {}
+            match = re.match(r'{(.+)}', root.tag)
+            if match:
+                ns['ns'] = match.group(1)
+                ns_prefix = '{' + ns['ns'] + '}'
+            else:
+                ns_prefix = ''
             
-            def parse_xml():
-                self.xml_tree = ET.parse(file_path)
-                self.root.after(0, display_results)
+            # Finde alle Instrumente in der MusicXML-Datei
+            found_instruments = []
             
-            def display_results():
-                root = self.xml_tree.getroot()
+            # Suche nach score-part-Elementen
+            part_elements = root.findall('.//' + ns_prefix + 'score-part')
+            
+            # Header für die Tabelle
+            header_frame = ttk.Frame(self.scrollable_frame)
+            header_frame.pack(fill=tk.X, pady=5)
+            
+            ttk.Label(header_frame, text="Original Name", width=20).grid(row=0, column=0, padx=5)
+            ttk.Label(header_frame, text="Sound Library", width=15).grid(row=0, column=1, padx=5)
+            ttk.Label(header_frame, text="Kategorie", width=15).grid(row=0, column=2, padx=5)
+            ttk.Label(header_frame, text="Instrument", width=20).grid(row=0, column=3, padx=5)
+            ttk.Label(header_frame, text="Vorschau", width=30).grid(row=0, column=4, padx=5)
+            
+            # Für jedes gefundene Instrument
+            for idx, part in enumerate(part_elements):
+                part_id = part.get('id')
                 
-                # Finde Namespace falls vorhanden
-                ns = {}
-                match = re.match(r'{(.+)}', root.tag)
-                if match:
-                    ns['ns'] = match.group(1)
-                    ns_prefix = '{' + ns['ns'] + '}'
+                # Finde den Instrumentennamen
+                part_name_elem = part.find('.//' + ns_prefix + 'part-name')
+                if part_name_elem is not None and part_name_elem.text:
+                    part_name = part_name_elem.text.strip()
                 else:
-                    ns_prefix = ''
+                    part_name = f"Instrument {idx+1}"
                 
-                # Finde alle Instrumente in der MusicXML-Datei
-                found_instruments = []
+                # Finde instrument-sound wenn vorhanden
+                instrument_sound = None
+                sound_elem = part.find('.//' + ns_prefix + 'instrument-sound')
+                if sound_elem is not None and sound_elem.text:
+                    instrument_sound = sound_elem.text.strip()
                 
-                # Suche nach score-part-Elementen
-                part_elements = root.findall('.//' + ns_prefix + 'score-part')
+                # Erstelle ein neues Mapping für dieses Instrument
+                mapping_frame = ttk.Frame(self.scrollable_frame)
+                mapping_frame.pack(fill=tk.X, pady=2)
                 
-                # Header für die Tabelle
-                header_frame = ttk.Frame(self.scrollable_frame)
-                header_frame.pack(fill=tk.X, pady=5)
+                ttk.Label(mapping_frame, text=part_name, width=20).grid(row=0, column=0, padx=5)
                 
-                ttk.Label(header_frame, text="Original Name", width=20).grid(row=0, column=0, padx=5)
-                ttk.Label(header_frame, text="Sound Library", width=15).grid(row=0, column=1, padx=5)
-                ttk.Label(header_frame, text="Kategorie", width=15).grid(row=0, column=2, padx=5)
-                ttk.Label(header_frame, text="Instrument", width=20).grid(row=0, column=3, padx=5)
-                ttk.Label(header_frame, text="Vorschau", width=30).grid(row=0, column=4, padx=5)
+                # Erstelle Dropdown für Sound-Library
+                library_var = tk.StringVar()
+                library_dropdown = ttk.Combobox(mapping_frame, textvariable=library_var, width=15)
+                library_dropdown['values'] = list(self.sound_libraries.keys())
+                library_dropdown.current(0)  # Setze Standard
+                library_dropdown.grid(row=0, column=1, padx=5)
                 
-                # Für jedes gefundene Instrument
-                for idx, part in enumerate(part_elements):
-                    part_id = part.get('id')
-                    
-                    # Finde den Instrumentennamen
-                    part_name_elem = part.find('.//' + ns_prefix + 'part-name')
-                    if part_name_elem is not None and part_name_elem.text:
-                        part_name = part_name_elem.text.strip()
-                    else:
-                        part_name = f"Instrument {idx+1}"
-                    
-                    # Finde instrument-sound wenn vorhanden
-                    instrument_sound = None
-                    sound_elem = part.find('.//' + ns_prefix + 'instrument-sound')
-                    if sound_elem is not None and sound_elem.text:
-                        instrument_sound = sound_elem.text.strip()
-                    
-                    # Erstelle ein neues Mapping für dieses Instrument
-                    mapping_frame = ttk.Frame(self.scrollable_frame)
-                    mapping_frame.pack(fill=tk.X, pady=2)
-                    
-                    ttk.Label(mapping_frame, text=part_name, width=20).grid(row=0, column=0, padx=5)
-                    
-                    # Erstelle Dropdown für Sound-Library
-                    library_var = tk.StringVar()
-                    library_dropdown = ttk.Combobox(mapping_frame, textvariable=library_var, width=15)
-                    library_dropdown['values'] = list(self.sound_libraries.keys())
-                    library_dropdown.current(0)  # Setze Standard
-                    library_dropdown.grid(row=0, column=1, padx=5)
-                    
-                    # Erstelle Dropdown für Kategorie
-                    category_var = tk.StringVar()
-                    category_dropdown = ttk.Combobox(mapping_frame, textvariable=category_var, width=15)
-                    category_dropdown['values'] = ["Strings", "Woodwinds", "Brass", "Percussion", "Keyboard", "Choir"]
-                    
-                    # Versuche, die Kategorie zu erraten
-                    guessed_category = None
-                    for key, category in self.instrument_categories.items():
-                        if key.lower() in part_name.lower():
-                            guessed_category = category
-                            break
-                    
-                    if guessed_category:
-                        category_var.set(guessed_category)
-                    else:
-                        category_dropdown.current(0)  # Setze Standard
-                    
-                    category_dropdown.grid(row=0, column=2, padx=5)
-                    
-                    # Erstelle Dropdown für Instrument
-                    instrument_var = tk.StringVar()
-                    instrument_dropdown = ttk.Combobox(mapping_frame, textvariable=instrument_var, width=20)
-                    
-                    # Aktualisiere Instrument-Dropdown basierend auf Kategorie
-                    def update_instruments(*args):
-                        library = library_var.get()
-                        category = category_var.get()
-                        if library in self.sound_libraries and category in self.sound_libraries[library]:
-                            instrument_dropdown['values'] = self.sound_libraries[library][category]
-                            if instrument_dropdown['values']:
-                                instrument_dropdown.current(0)
-                        update_preview()
-                    
-                    library_var.trace_add("write", update_instruments)
-                    category_var.trace_add("write", update_instruments)
-                    
-                    instrument_dropdown.grid(row=0, column=3, padx=5)
-                    
-                    # Test-Sound-Button
-                    test_button = ttk.Button(mapping_frame, text="🔊", width=3, 
-                                            command=lambda ins=instrument_var: self.play_test_sound(ins.get()))
-                    test_button.grid(row=0, column=5, padx=2)
-                    
-                    # Vorschau des Sound-Identifiers
-                    preview_var = tk.StringVar()
-                    preview_label = ttk.Label(mapping_frame, textvariable=preview_var, width=30)
-                    preview_label.grid(row=0, column=4, padx=5)
-                    
-                    def update_preview(*args):
-                        preview_var.set(instrument_var.get())
-                    
-                    instrument_var.trace_add("write", update_preview)
-                    
-                    # Initial aktualisieren
-                    update_instruments()
-                    
-                    # Speichere Mapping-Informationen
-                    self.instrument_mappings.append({
-                        'part_id': part_id,
-                        'part_name': part_name,
-                        'library_var': library_var,
-                        'category_var': category_var,
-                        'instrument_var': instrument_var,
-                        'original_sound': instrument_sound
-                    })
+                # Erstelle Dropdown für Kategorie
+                category_var = tk.StringVar()
+                category_dropdown = ttk.Combobox(mapping_frame, textvariable=category_var, width=15)
+                category_dropdown['values'] = ["Strings", "Woodwinds", "Brass", "Percussion"]
                 
-                self.status_var.set(f"{len(self.instrument_mappings)} Instrumente gefunden.")
+                # Versuche, die Kategorie zu erraten
+                guessed_category = None
+                for key, category in self.instrument_categories.items():
+                    if key.lower() in part_name.lower():
+                        guessed_category = category
+                        break
+                
+                if guessed_category:
+                    category_var.set(guessed_category)
+                else:
+                    category_dropdown.current(0)  # Setze Standard
+                
+                category_dropdown.grid(row=0, column=2, padx=5)
+                
+                # Erstelle Dropdown für Instrument
+                instrument_var = tk.StringVar()
+                instrument_dropdown = ttk.Combobox(mapping_frame, textvariable=instrument_var, width=20)
+                
+                # Aktualisiere Instrument-Dropdown basierend auf Kategorie
+                def update_instruments(*args):
+                    library = library_var.get()
+                    category = category_var.get()
+                    if library in self.sound_libraries and category in self.sound_libraries[library]:
+                        instrument_dropdown['values'] = self.sound_libraries[library][category]
+                        if instrument_dropdown['values']:
+                            instrument_dropdown.current(0)
+                    update_preview()
+                
+                library_var.trace_add("write", update_instruments)
+                category_var.trace_add("write", update_instruments)
+                
+                instrument_dropdown.grid(row=0, column=3, padx=5)
+                
+                # Vorschau des Sound-Identifiers
+                preview_var = tk.StringVar()
+                preview_label = ttk.Label(mapping_frame, textvariable=preview_var, width=30)
+                preview_label.grid(row=0, column=4, padx=5)
+                
+                def update_preview(*args):
+                    preview_var.set(instrument_var.get())
+                
+                instrument_var.trace_add("write", update_preview)
+                
+                # Initial aktualisieren
+                update_instruments()
+                
+                # Speichere Mapping-Informationen
+                self.instrument_mappings.append({
+                    'part_id': part_id,
+                    'part_name': part_name,
+                    'library_var': library_var,
+                    'category_var': category_var,
+                    'instrument_var': instrument_var,
+                    'original_sound': instrument_sound
+                })
             
-            # Starte das Parsing in einem separaten Thread
-            thread = threading.Thread(target=parse_xml)
-            thread.daemon = True
-            thread.start()
+            self.status_var.set(f"{len(self.instrument_mappings)} Instrumente gefunden.")
             
         except Exception as e:
             messagebox.showerror("Fehler", f"Fehler beim Analysieren der Datei: {str(e)}")
@@ -534,10 +350,7 @@ class MusicXMLInstrumentMapper:
                 "/Applications/MuseScore 4.app/Contents/Resources",
                 "/Applications/MuseScore 3.app/Contents/Resources",
                 os.path.expanduser("~/Library/Application Support/MuseScore"),
-                os.path.expanduser("~/Library/Application Support/MuseHub"),
-                os.path.expanduser("~/Library/Preferences/MuseScore"),
-                os.path.expanduser("~/Documents/MuseScore4/Plugins"),
-                os.path.expanduser("~/Music/Audio Music Apps/MuseScore")
+                os.path.expanduser("~/Library/Application Support/MuseHub")
             ]
         
         elif system == "Linux":
